@@ -1,3 +1,5 @@
+## BE CAREFUL. THIS MACRO IS FAR FROM BEING FINISHED. USE IT ON YOUR OWN RISK!
+
 # Mach3 Manual Tool Change Macro
 In this repository a tool change macro for Mach3 is developed. The focus of this macro is for manual tool change, i.e., the following steps are executed when the M6 T... G-Code is called:
 * automatic spindle is stopped (default of Mach3)
