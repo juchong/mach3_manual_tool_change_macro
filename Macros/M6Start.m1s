@@ -1,0 +1,169 @@
+' From http://www.machsupport.com/forum/index.php?topic=29904.0;wap2
+'G49 (Cancel TLO)
+'G58 (Switch to work offset G58)
+'G0 X0 Y0 (move the tool over the toolsetter)
+'G31 Z-10 F150 (probe tool down till it touches the toolsetter)
+'G10 L1 P1 Z#2002 (set the tool length offset value to the G58 Z position where the probe tripped)
+'G0 Z5 (move up to safe distance)
+'G54 (reapply old work offset coordinate system)
+'G43 H1 (apply new TLO for tool 1) 
+
+'TODO define tool change position
+'TODO define tool length measurement position
+
+'tool = GetSelectedTool()
+'SetCurrentTool( tool )
+'code"G0 Z50"
+
+
+var_toolx  = 100
+var_tooly  = 101
+var_toolz  = 102
+var_calibx = 103
+var_caliby = 104
+var_calibz = 105
+var_calibrationz = 106
+
+'var_toolx  = 500
+'var_tooly  = 501
+'var_toolz  = 502
+'var_calibx = 503
+'var_caliby = 504
+'var_calibz = 505
+'var_calibrationz = 506
+
+'Test prerequisites of this script
+'TODO check for homing enabled, otherwise Z=0 is somewhere unknown
+If IsSuchSignal(22) Then
+	'Retrieve positions from calibration
+	tool_x = GetVar(var_toolx)
+	tool_y = GetVar(var_tooly)
+	tool_z = GetVar(var_toolz)
+	overcalib_x = GetVar(var_calibx)
+	overcalib_y = GetVar(var_caliby)
+	overcalib_z = GetVar(var_calibz)
+		
+	calibration_z = GetVar(var_calibrationz)
+
+	'Get current position
+	x = GetToolChangeStart( 0 )
+	y = GetToolChangeStart( 1 )
+	z = GetToolChangeStart( 2 )
+	
+	OldAbsoluteMode = GetOemLED(48)
+	OldFeedRate = FeedRate
+	MaxFeedRate = GetOemDRO(104)
+	OldTool = GetCurrentTool()
+	NewTool = GetSelectedTool()
+	
+	OldToolLengthOffset = ToolLengthOffset()
+	
+	'TODO: SetCurrentTool(NewTool)
+
+	Code("G90")
+	
+    MachMsg("Move up", "Tool change", 0)    
+    'Move z to safe position (homing height)
+    'Code("G53G0Z0")
+    Code("G91G0Z20")
+    While IsMoving
+		Sleep 100
+    Wend
+
+    MachMsg("Move to tool change position", "Tool change", 0)    
+    'Move to tool change position
+    'Code("G53G0X42Y0")
+    Code("G90G0X0Y0")
+    While IsMoving
+		Sleep 100
+    Wend
+    
+    Response = MachMsg("Please change tool. When you press Ok, the gantry will measure the tool length.", "Tool change", 1)
+    
+    If Response = 2 Then
+    	End
+    End If
+    
+    MachMsg("Move to measurement position", "Tool change", 0)    
+    'Move to tool length measurement position
+    'Code("G53G0X-20Y-20")
+    Code("G90G0X10Y10")
+    While IsMoving
+		Sleep 100
+    Wend
+    
+    'goto 2
+
+	Code("G49")
+	MachMsg("Probing fast", "Process", 0)
+	Code("F25G31Z-5")
+	'SetFeedRate(9000)
+	'Code("G91G1Z-30")
+	While IsMoving
+		Sleep 100
+    Wend
+
+	MachMsg("Go up a little bit", "Process", 0)
+	Code("G91G0Z5")
+	While IsMoving
+		Sleep 100
+    Wend
+    Code("G90")
+	MachMsg("Probing G31 slow", "Process", 0)
+	'SetFeedRate(1500)
+	'Code("G91G1Z-10")
+	'Code("G31 Z-10 F25")
+	While IsMoving
+		Sleep 100
+    Wend
+'    SlowZ = #2002
+    
+'G10 L1 P1 Z#2002 (set the tool length offset value to the G58 Z position where the probe tripped)
+'G0 Z5 (move up to safe distance)
+'G54 (reapply old work offset coordinate system)
+'G43 H1 (apply new TLO for tool 1) 
+
+	MsgBox "TLO in G31 option is " & IncludeTLOinZFromG31()
+
+	'Move up to safe z
+	'Code("G53G90G0Z0")
+	Code("G91G0Z50")
+	While IsMoving
+		Sleep 100
+    Wend
+	
+
+    2:
+        
+    MachMsg("Moving back to original position", "Tool change", 0)    
+    
+    Code("G90G0X" & x & "Y" & y)
+    While IsMoving
+		Sleep 100
+    Wend
+    
+    MachMsg("Moving back Z", "Tool change", 0)    
+
+    Code("G90G0Z" & z)
+    While IsMoving
+		Sleep 100
+    Wend
+    
+
+    MachMsg("Reseting modes", "Tool change", 0)    
+            
+    SetFeedRate(OldFeedRate)
+
+    'Reset mode
+    If OldAbsoluteMode Then
+    	Code("G90")
+    Else
+    	Code("G91")
+    End If
+
+Else
+    MachMsg("No probing available. Check the input signal of the probe!", "Probing error", 0) 
+End If
+
+
+
