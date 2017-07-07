@@ -17,6 +17,7 @@ org_tool_x = 30
 org_tool_y = -52
 org_tool_z = 26
 
+'Position over tool length sensor
 org_overcalib_x = -41
 org_overcalib_y = -56
 org_overcalib_z = 22
@@ -46,6 +47,22 @@ var_calibrationz = 106
 'Test prerequisites of this script
 'TODO check for homing enabled, otherwise Z=0 is somewhere unknown
 If IsSuchSignal(22) Then
+
+	'Get current position
+	x = GetToolChangeStart( 0 )
+	y = GetToolChangeStart( 1 )
+	z = GetToolChangeStart( 2 )
+	
+	OldAbsoluteMode = GetOemLED(48)
+	OldFeedRate = FeedRate
+	MaxFeedRate = GetOemDRO(104)
+	OldTool = GetCurrentTool()
+	NewTool = GetSelectedTool()
+	
+	SetCurrentTool( 0 )
+	
+	MachMsg("x = " & x & ", y = " & y & ", z = " & z & ", OldT = " & OldTool & ", NewT = " & NewTool, "Values", 0)
+
 
 	Response = MachMsg("Do you want to calibrate the tool sensor?", "Calibration required?", 4)
 	If Response = 6 Then
@@ -120,21 +137,6 @@ If IsSuchSignal(22) Then
 	calibration_z = GetVar(var_calibrationz)
 	
 	MachMsg("Tool sensor calibrated at " & calibration_z, "Calibration value", 0)
-
-	'Get current position
-	x = GetToolChangeStart( 0 )
-	y = GetToolChangeStart( 1 )
-	z = GetToolChangeStart( 2 )
-	
-	OldAbsoluteMode = GetOemLED(48)
-	OldFeedRate = FeedRate
-	MaxFeedRate = GetOemDRO(104)
-	OldTool = GetCurrentTool()
-	NewTool = GetSelectedTool()
-	
-	OldToolLengthOffset = ToolLengthOffset()
-
-	MachMsg("x = " & x & ", y = " & y & ", z = " & z & ", OldT = " & OldTool & ", NewT = " & NewTool & ", Old TLO = " & OldToolLengthOffset, "Values", 0)
 	
 	'TODO: SetCurrentTool(NewTool)
 
