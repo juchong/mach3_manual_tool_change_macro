@@ -1,48 +1,47 @@
-' From http://www.machsupport.com/forum/index.php?topic=29904.0;wap2
-'G49 (Cancel TLO)
-'G58 (Switch to work offset G58)
-'G0 X0 Y0 (move the tool over the toolsetter)
-'G31 Z-10 F150 (probe tool down till it touches the toolsetter)
-'G10 L1 P1 Z#2002 (set the tool length offset value to the G58 Z position where the probe tripped)
-'G0 Z5 (move up to safe distance)
-'G54 (reapply old work offset coordinate system)
-'G43 H1 (apply new TLO for tool 1) 
+'-------------- Configuration --------------
+'This option switches between using the machine
+'coordinates (G53) or the normal working coordinates.
+'!!! Warning: Use this only if homing is enabled !!! 
+UseG53 = false 
 
-'TODO define tool change position
-'TODO define tool length measurement position
 
-'-------------- Edit these locations -----------
-'Position over tool change
+'Position over tool change. Position for z is
+'ignored if machine coordinate system is used.
 org_tool_x = 30
 org_tool_y = -52
 org_tool_z = 26
 
-'Position over tool length sensor
+'Position over tool length sensor. Position for 
+'z is ignored if machine coordinate system is 
+'used.
 org_overcalib_x = -41
 org_overcalib_y = -56
 org_overcalib_z = 22
-'--------------------- END ---------------------
+'------------- Configuration END -----------
 
 move_z_down_time_reduce = -30
 
 
-'Variables that should be stored until power off
-var_toolx  = 100
-var_tooly  = 101
-var_toolz  = 102
-var_calibx = 103
-var_caliby = 104
-var_calibz = 105
-var_calibrationz = 106
+if UseG53 Then
+	'Variables that should be stored permanently
+	var_toolx  = 500
+	var_tooly  = 501
+	var_toolz  = 502
+	var_calibx = 503
+	var_caliby = 504
+	var_calibz = 505
+	var_calibrationz = 506
+Else
+	'Variables that should be stored until power off
+	var_toolx  = 100
+	var_tooly  = 101
+	var_toolz  = 102
+	var_calibx = 103
+	var_caliby = 104
+	var_calibz = 105
+	var_calibrationz = 106
+End If
 
-'Variables that should be stored permanently
-'var_toolx  = 500
-'var_tooly  = 501
-'var_toolz  = 502
-'var_calibx = 503
-'var_caliby = 504
-'var_calibz = 505
-'var_calibrationz = 506
 
 'Test prerequisites of this script
 'TODO check for homing enabled, otherwise Z=0 is somewhere unknown
@@ -61,7 +60,7 @@ If IsSuchSignal(22) Then
 	
 	SetCurrentTool( 0 )
 	
-	MachMsg("x = " & x & ", y = " & y & ", z = " & z & ", OldT = " & OldTool & ", NewT = " & NewTool, "Values", 0)
+	'MachMsg("x = " & x & ", y = " & y & ", z = " & z & ", OldT = " & OldTool & ", NewT = " & NewTool, "Values", 0)
 
 
 	Response = MachMsg("Do you want to calibrate the tool sensor?", "Calibration required?", 4)
@@ -74,13 +73,21 @@ If IsSuchSignal(22) Then
 		SetVar(var_calibz, org_overcalib_z)
 
 		'Move up
-		Code("G90G0Z" & org_overcalib_z)
+		If UseG53 Then
+			Code("G53G90G0Z0")
+		Else
+			Code("G90G0Z" & org_overcalib_z)
+		End If
 		While IsMoving
 			Sleep 100
 		Wend
 		
 		'Move to measurement position
-		Code("G90G0X" & org_overcalib_x & "Y" & org_overcalib_y)
+		If UseG53 Then
+			Code("G53G90G0X" & org_overcalib_x & "Y" & org_overcalib_y)
+		Else
+			Code("G90G0X" & org_overcalib_x & "Y" & org_overcalib_y)
+		End If
 		While IsMoving
 			Sleep 100
 		Wend
@@ -93,7 +100,6 @@ If IsSuchSignal(22) Then
 		
 		'Fast probing
 		Code("G91G31Z-30F150")
-		'Code("G91G1Z-10F150")
 		While IsMoving
 			Sleep 100
 		Wend
@@ -106,7 +112,6 @@ If IsSuchSignal(22) Then
 
 		'Slow probing
 		Code("G91G31Z-2.5F25")
-		'Code("G91G1Z-5F25")
 		While IsMoving
 			Sleep 100
 		Wend
@@ -114,8 +119,15 @@ If IsSuchSignal(22) Then
 		calibration_z = GetVar(2002)
 		SetVar(var_calibrationz, calibration_z)	
 
+		'TODO and remove
+		'MachMsg("Please take a look at calibration_z. Is it in G53?", "Check", 0)
+
 		'Go up a few mm
-		Code("G90G0Z" & org_overcalib_z)
+		If UseG53 Then
+			Code("G53G90G0Z0")
+		Else
+			Code("G90G0Z" & org_overcalib_z)
+		End If
 		While IsMoving
 			Sleep 100
 		Wend
