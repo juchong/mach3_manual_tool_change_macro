@@ -1,49 +1,72 @@
-' From http://www.machsupport.com/forum/index.php?topic=29904.0;wap2
-'G49 (Cancel TLO)
-'G58 (Switch to work offset G58)
-'G0 X0 Y0 (move the tool over the toolsetter)
-'G31 Z-10 F150 (probe tool down till it touches the toolsetter)
-'G10 L1 P1 Z#2002 (set the tool length offset value to the G58 Z position where the probe tripped)
-'G0 Z5 (move up to safe distance)
-'G54 (reapply old work offset coordinate system)
-'G43 H1 (apply new TLO for tool 1) 
+'Copyright (c) 2017 Jan Roters
+'
+'Permission is hereby granted, free of charge, to any person obtaining a copy
+'of this software and associated documentation files (the "Software"), to deal
+'in the Software without restriction, including without limitation the rights
+'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+'copies of the Software, and to permit persons to whom the Software is
+'furnished to do so, subject to the following conditions:
+'
+'The above copyright notice and this permission notice shall be included in all
+'copies or substantial portions of the Software.
+'
+'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+'SOFTWARE.
 
-'TODO define tool change position
-'TODO define tool length measurement position
+'-------------- Configuration --------------
+'This option switches between using the machine
+'coordinates (G53) or the normal working coordinates.
+'!!! Warning: Use this only if homing is enabled !!! 
+UseG53 = false 
 
-'tool = GetSelectedTool()
-'SetCurrentTool( tool )
-'code"G0 Z50"
+
+'Position over tool change. Position for z is
+'ignored if machine coordinate system is used.
+org_tool_x = 30
+org_tool_y = -52
+org_tool_z = 26
+
+'Position over tool length sensor. Position for 
+'z is ignored if machine coordinate system is 
+'used.
+org_overcalib_x = -41
+org_overcalib_y = -56
+org_overcalib_z = 22
+
+'This variable tells the gantry to move down quickly
+'to reduce the time for fast probing
+move_z_down_time_reduce = -30
+'------------- Configuration END -----------
 
 
-var_toolx  = 100
-var_tooly  = 101
-var_toolz  = 102
-var_calibx = 103
-var_caliby = 104
-var_calibz = 105
-var_calibrationz = 106
 
-'var_toolx  = 500
-'var_tooly  = 501
-'var_toolz  = 502
-'var_calibx = 503
-'var_caliby = 504
-'var_calibz = 505
-'var_calibrationz = 506
+if UseG53 Then
+	'Variables that should be stored permanently
+	var_toolx  = 500
+	var_tooly  = 501
+	var_toolz  = 502
+	var_calibx = 503
+	var_caliby = 504
+	var_calibz = 505
+	var_calibrationz = 506
+Else
+	'Variables that should be stored until power off
+	var_toolx  = 100
+	var_tooly  = 101
+	var_toolz  = 102
+	var_calibx = 103
+	var_caliby = 104
+	var_calibz = 105
+	var_calibrationz = 106
+End If
 
-'Test prerequisites of this script
-'TODO check for homing enabled, otherwise Z=0 is somewhere unknown
+
 If IsSuchSignal(22) Then
-	'Retrieve positions from calibration
-	tool_x = GetVar(var_toolx)
-	tool_y = GetVar(var_tooly)
-	tool_z = GetVar(var_toolz)
-	overcalib_x = GetVar(var_calibx)
-	overcalib_y = GetVar(var_caliby)
-	overcalib_z = GetVar(var_calibz)
-		
-	calibration_z = GetVar(var_calibrationz)
 
 	'Get current position
 	x = GetToolChangeStart( 0 )
@@ -56,24 +79,134 @@ If IsSuchSignal(22) Then
 	OldTool = GetCurrentTool()
 	NewTool = GetSelectedTool()
 	
-	OldToolLengthOffset = ToolLengthOffset()
+	SetCurrentTool( 0 )
+	
+	tmp_calibration_z = GetVar(var_calibrationz)
+
+	calibrate_sensor = false
+	If tmp_calibration_z = 0 Then
+		Response = MachMsg("The tool length sensor is not calibrated. Do you want to calibrate the tool sensor?", "Calibration required", 4)
+		If Response = 6 Then
+			calibrate_sensor = true
+		End If
+	Else
+		Response = MachMsg("Do you want to recalibrate the tool sensor?", "Calibration", 4)
+		If Response = 6 Then
+			calibrate_sensor = true
+		End If		
+	End If
+	
+	'MachMsg("x = " & x & ", y = " & y & ", z = " & z & ", OldT = " & OldTool & ", NewT = " & NewTool, "Values", 0)
+
+
+	If calibrate_sensor Then
+		SetVar(var_toolx, org_tool_x)
+		SetVar(var_tooly, org_tool_y)
+		SetVar(var_toolz, org_tool_z)
+		SetVar(var_calibx, org_overcalib_x)
+		SetVar(var_caliby, org_overcalib_y)
+		SetVar(var_calibz, org_overcalib_z)
+
+		'Move up
+		If UseG53 Then
+			Code("G53G90G0Z0")
+		Else
+			Code("G90G0Z" & org_overcalib_z)
+		End If
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Move to measurement position
+		If UseG53 Then
+			Code("G53G90G0X" & org_overcalib_x & "Y" & org_overcalib_y)
+		Else
+			Code("G90G0X" & org_overcalib_x & "Y" & org_overcalib_y)
+		End If
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Move some mm down to shorten the time
+		Code("G91G0Z" & move_z_down_time_reduce)
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Fast probing
+		Code("G91G31Z" & move_z_down_time_reduce & "F150")
+		While IsMoving
+			Sleep 100
+		Wend
+		
+		'Go up a few mm
+		Code("G91G0Z2")
+		While IsMoving
+			Sleep 100
+		Wend
+
+		'Slow probing
+		Code("G91G31Z-2.5F25")
+		While IsMoving
+			Sleep 100
+		Wend
+
+		calibration_z = GetVar(2002)
+		SetVar(var_calibrationz, calibration_z)	
+
+		'TODO and remove
+		'MachMsg("Please take a look at calibration_z. Is it in G53?", "Check", 0)
+
+		'Go up a few mm
+		If UseG53 Then
+			Code("G53G90G0Z0")
+		Else
+			Code("G90G0Z" & org_overcalib_z)
+		End If
+		While IsMoving
+			Sleep 100
+		Wend
+	End If
+
+	Response = MachMsg("Ok, los geht's", "WARNING!", 1)
+	If Response = 2 Then
+    	End
+	End If
+
+	'Retrieve positions from calibration
+	tool_x = GetVar(var_toolx)
+	tool_y = GetVar(var_tooly)
+	tool_z = GetVar(var_toolz)
+	overcalib_x = GetVar(var_calibx)
+	overcalib_y = GetVar(var_caliby)
+	overcalib_z = GetVar(var_calibz)
+		
+	calibration_z = GetVar(var_calibrationz)
+	
+	'MachMsg("Tool sensor calibrated at " & calibration_z, "Calibration value", 0)
 	
 	'TODO: SetCurrentTool(NewTool)
 
 	Code("G90")
 	
-    MachMsg("Move up", "Tool change", 0)    
+    'MachMsg("Move up", "Tool change", 0)    
     'Move z to safe position (homing height)
-    'Code("G53G0Z0")
-    Code("G91G0Z20")
+    If UseG53 Then
+    	Code("G53G90Z0")
+    Else
+        Code("G90G0Z" & tool_z)
+    End If
     While IsMoving
 		Sleep 100
     Wend
 
-    MachMsg("Move to tool change position", "Tool change", 0)    
+    'MachMsg("Move to tool change position", "Tool change", 0)    
     'Move to tool change position
-    'Code("G53G0X42Y0")
-    Code("G90G0X0Y0")
+    If UseG53 Then
+        Code("G53G90G0X" & tool_x & "Y" & tool_y)
+    Else
+        Code("G90G0X" & tool_x & "Y" & tool_y)
+    End If
     While IsMoving
 		Sleep 100
     Wend
@@ -83,57 +216,64 @@ If IsSuchSignal(22) Then
     If Response = 2 Then
     	End
     End If
-    
-    MachMsg("Move to measurement position", "Tool change", 0)    
+        
+    'MachMsg("Move to measurement position", "Tool change", 0)    
     'Move to tool length measurement position
-    'Code("G53G0X-20Y-20")
-    Code("G90G0X10Y10")
+    If UseG53 Then
+        Code("G53G90G0X" & overcalib_x & "Y" & overcalib_y)
+    Else
+        Code("G90G0X" & overcalib_x & "Y" & overcalib_y)
+    End If
     While IsMoving
 		Sleep 100
     Wend
     
-    'goto 2
-
-	Code("G49")
-	MachMsg("Probing fast", "Process", 0)
-	Code("F25G31Z-5")
-	'SetFeedRate(9000)
-	'Code("G91G1Z-30")
+    'MachMsg("Move down a little bit", "Tool change", 0)    
+	'Move some mm down to shorten the time
+	Code("G91G0Z" & move_z_down_time_reduce)
 	While IsMoving
 		Sleep 100
-    Wend
-
-	MachMsg("Go up a little bit", "Process", 0)
-	Code("G91G0Z5")
-	While IsMoving
-		Sleep 100
-    Wend
-    Code("G90")
-	MachMsg("Probing G31 slow", "Process", 0)
-	'SetFeedRate(1500)
-	'Code("G91G1Z-10")
-	'Code("G31 Z-10 F25")
-	While IsMoving
-		Sleep 100
-    Wend
-'    SlowZ = #2002
+	Wend
     
-'G10 L1 P1 Z#2002 (set the tool length offset value to the G58 Z position where the probe tripped)
-'G0 Z5 (move up to safe distance)
-'G54 (reapply old work offset coordinate system)
-'G43 H1 (apply new TLO for tool 1) 
+	Code("G49")
+	'MachMsg("Probing fast", "Process", 0)
+	Code("G91G31Z" & move_z_down_time_reduce & "F150")
+	While IsMoving
+		Sleep 100
+    Wend
 
-	MsgBox "TLO in G31 option is " & IncludeTLOinZFromG31()
-
+	'MachMsg("Go up a little bit", "Process", 0)
+	Code("G91G0Z2")
+	While IsMoving
+		Sleep 100
+    Wend
+    
+	'Slow probing
+	Code("G91G31Z-2.5F25")
+	While IsMoving
+		Sleep 100
+	Wend
+    
+    new_calib_z = GetVar(2002)
+    
+    diff_z = new_calib_z - calibration_z
+    
+    'Response = MachMsg("Old Value: " & calibration_z & ", New Value: " & new_calib_z & ", Diff: " & diff_z, "Value", 1)
+        
 	'Move up to safe z
-	'Code("G53G90G0Z0")
-	Code("G91G0Z50")
+	If UseG53 Then
+		Code("G53G90G0Z0")
+	Else
+		Code("G90G0Z" & tool_z)
+	End If
 	While IsMoving
 		Sleep 100
     Wend
 	
-
-    2:
+	
+	Code("G10 L1 P" & NewTool & " Z" & diff_z)
+	Code("G43 H" & NewTool)
+	SetCurrentTool( NewTool )
         
     MachMsg("Moving back to original position", "Tool change", 0)    
     
@@ -142,16 +282,11 @@ If IsSuchSignal(22) Then
 		Sleep 100
     Wend
     
-    MachMsg("Moving back Z", "Tool change", 0)    
-
     Code("G90G0Z" & z)
     While IsMoving
 		Sleep 100
     Wend
-    
-
-    MachMsg("Reseting modes", "Tool change", 0)    
-            
+                
     SetFeedRate(OldFeedRate)
 
     'Reset mode
@@ -161,6 +296,7 @@ If IsSuchSignal(22) Then
     	Code("G91")
     End If
 
+    MachMsg("Tool change finished. Please start the spindle and press Ok.", "Tool change", 0)
 Else
     MachMsg("No probing available. Check the input signal of the probe!", "Probing error", 0) 
 End If
