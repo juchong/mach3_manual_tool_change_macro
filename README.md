@@ -18,6 +18,8 @@ The script's features include:
 * CNC Router or CNC Mill (Tested with an OMIOCNC X8-2200L-USB)
 * Mach 3
 * Limit switches and hardware used for homing CNC
+* Pre-configured input for the probe
+* Standard CNC router probe (available from many vendors on Amazon, AliExpress, etc.)
 
 ## How the Macro Works
 Detailed steps:
