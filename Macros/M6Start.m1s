@@ -28,13 +28,19 @@ org_tool_x = 262
 org_tool_y = -636
 
 'Position of tool length sensor in machine coordinates. 
-org_overcalib_x = 55.5
-org_overcalib_y = -203
+org_overcalib_x = 65.5
+org_overcalib_y = -200
+
+'Position over tool change. Position for z is
+'ignored if machine coordinate system is used.
+org_tool_x = 262
+org_tool_y = -636
+org_tool_z = -2
 
 'This variable tells the gantry to move down quickly
 'to reduce the time for fast probing.
 'Note this is with reference to machine coordinates.
-move_z_down_time_reduce = -10
+move_z_down_time_reduce = -40
 
 '------------- Configuration END -----------
 
@@ -246,8 +252,8 @@ If IsSuchSignal(22) Then
 		Sleep 100
     Wend
     
-    'Move Z to original position + offset
-    Code("G90G0Z" & z)
+    'Move to safe Z
+    Code("G53G90G0Z0")
     While IsMoving
 		Sleep 100
     Wend
