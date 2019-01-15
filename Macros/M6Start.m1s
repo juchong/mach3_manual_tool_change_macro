@@ -18,7 +18,7 @@
 'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 'SOFTWARE.
 
-'Modified by Juan Chong 01/09/2019
+'Modified by Juan Chong 01/15/2019
 'Tested with an OMIOCNC X8-2200L-USB
 
 '-------------- Configuration --------------
@@ -51,6 +51,11 @@ var_calibx = 503
 var_caliby = 504
 var_calibz = 505
 var_calibrationz = 506
+
+Response = MachMsg("Is this a single-tool job (skip probing)?", "Skip Probing", 4)
+If Response = 6 Then
+	End
+EndIf
 
 If IsSuchSignal(22) Then
 
@@ -147,7 +152,7 @@ If IsSuchSignal(22) Then
 		
 	End If
 
-	Response = MachMsg("Done! Let's get a new tool!", "WARNING!", 1)
+	Response = MachMsg("Should I move to tool change position?", "WARNING!", 1)
 	If Response = 2 Then
     	End
 	End If
@@ -241,19 +246,13 @@ If IsSuchSignal(22) Then
 	'Program tool length offset into Tool Table
 	Code("G43 H" & NewTool)
 
-	'Set program to use new tool
+	'Set machine to use new tool (and offset)
 	SetCurrentTool( NewTool )
         
-    MachMsg("Moving back to original position + tool offset.", "Tool change", 0)    
+    MachMsg("Moving back to original position X-Y position.", "Tool change", 0)    
     
     'Move X and Y to original position
     Code("G90G0X" & x & "Y" & y)
-    While IsMoving
-		Sleep 100
-    Wend
-    
-    'Move to safe Z
-    Code("G53G90G0Z0")
     While IsMoving
 		Sleep 100
     Wend
