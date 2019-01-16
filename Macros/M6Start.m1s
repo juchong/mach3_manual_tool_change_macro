@@ -28,14 +28,8 @@ org_tool_x = 262
 org_tool_y = -636
 
 'Position of tool length sensor in machine coordinates. 
-org_overcalib_x = 65.5
+org_overcalib_x = 80
 org_overcalib_y = -200
-
-'Position over tool change. Position for z is
-'ignored if machine coordinate system is used.
-org_tool_x = 262
-org_tool_y = -636
-org_tool_z = -2
 
 'This variable tells the gantry to move down quickly
 'to reduce the time for fast probing.
@@ -55,7 +49,7 @@ var_calibrationz = 506
 Response = MachMsg("Is this a single-tool job (skip probing)?", "Skip Probing", 4)
 If Response = 6 Then
 	End
-EndIf
+End If
 
 If IsSuchSignal(22) Then
 
